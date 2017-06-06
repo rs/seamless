@@ -5,17 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
-	reuseport "github.com/kavu/go_reuseport"
 	"github.com/rs/seamless"
 )
 
 var (
-	listen          = flag.String("listen", "localhost:8080", "Listen address")
-	pidFile         = flag.String("pid-file", "/tmp/reuseport.pid", "Seemless restart PID file")
+	sockPath        = flag.String("unix-socket", "/tmp/seamless.sock", "Listen unix socket")
+	pidFile         = flag.String("pid-file", "/tmp/unixsocket.pid", "Seemless restart PID file")
 	gracefulTimeout = flag.Duration("graceful-timeout", 60*time.Second, "Maximum duration to wait for in-flight requests")
 )
 
@@ -25,17 +25,19 @@ func init() {
 }
 
 func main() {
-	// Use github.com/kavu/go_reuseport waiting for
-	// https://github.com/golang/go/issues/9661 to be fixed.
-	//
-	// The idea of SO_REUSEPORT flag is that two processes can listen on the
-	// same host:port. Using the capability, the new daemon can listen while
-	// the old daemon is still bound, allowing seemless transition from one
-	// process to the other.
-	l, err := reuseport.Listen("tcp", *listen)
+	// Listen on unix socket. We first remove the socket if already exit (see
+	// below).
+	os.Remove(*sockPath)
+	l, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: *sockPath})
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Disable automatic removal of unix socket on close. With this strategy, it
+	// is the new process which is responsible for cleaning up the socket. This
+	// way, the old process can keep the previous socket available as long as
+	// possible.
+	l.SetUnlinkOnClose(false)
 
 	s := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

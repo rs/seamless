@@ -79,7 +79,8 @@ var (
 // either from the main method or preferably from the init method in the main package.
 //
 // The pidFile is used for signaling between the new and old generation of the daemon. This
-// file is not a traditional pid file to be used by the process manager.
+// file is not a traditional pid file to be used by the process manager. If the pidFile is
+// an empty string, seamless is disabled.
 func Init(pidFile string) {
 	if inited {
 		panic("seamless.Init already called")
@@ -88,11 +89,13 @@ func Init(pidFile string) {
 	inited = true
 
 	if pidFile == "" {
-		panic("pidFile is empty")
+		disabled = true
+		return
 	}
 	pidFilePath = pidFile
 
 	if os.Getenv("SEAMLESS") != strconv.Itoa(os.Getppid()) {
+		LogMessage("seamless: Starting child process")
 		if err := os.Setenv("SEAMLESS", strconv.Itoa(os.Getpid())); err != nil {
 			LogError("seamless: Could set SEAMLESS environment variable", err)
 			// Disable the whole system. It should let the daemon to start anyway
@@ -179,6 +182,7 @@ func stage3() {
 	// We are waiting for a TERM signal to more to the next stage (stage 3).
 	LogMessage("seamless: Ready, waiting for TERM signal")
 
+	signal.Reset(syscall.SIGTERM)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM)
 	select {
