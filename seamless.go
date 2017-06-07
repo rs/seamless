@@ -57,13 +57,13 @@ var (
 	// LogMessage is used to log messages. The default implementation is to call
 	// log.Print with the message.
 	LogMessage = func(msg string) {
-		log.Print(msg)
+		log.Printf("seamless: %s", msg)
 	}
 
 	// LogError is used to log errors. The default implementation is to call
 	// log.Printf with the message followed by the error.
 	LogError = func(msg string, err error) {
-		log.Printf("%s: %v", msg, err)
+		log.Printf("seamless: %s: %v", msg, err)
 	}
 
 	inited              bool
@@ -95,9 +95,9 @@ func Init(pidFile string) {
 	pidFilePath = pidFile
 
 	if os.Getenv("SEAMLESS") != strconv.Itoa(os.Getppid()) {
-		LogMessage("seamless: Starting child process")
+		LogMessage("Starting child process")
 		if err := os.Setenv("SEAMLESS", strconv.Itoa(os.Getpid())); err != nil {
-			LogError("seamless: Could set SEAMLESS environment variable", err)
+			LogError("Could set SEAMLESS environment variable", err)
 			// Disable the whole system. It should let the daemon to start anyway
 			// but with no seamless restart.
 			disabled = true
@@ -118,9 +118,9 @@ func stage1() {
 	<-c
 	signal.Stop(c)
 
-	LogMessage("seamless: Shutdown requested")
+	LogMessage("Shutdown requested")
 	if err := ioutil.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
-		LogError("seamless: Could not create PID file", err)
+		LogError("Could not create PID file", err)
 		return // XXX
 	}
 	if shutdownRequestFunc != nil {
@@ -129,10 +129,10 @@ func stage1() {
 	// At this point, we are ready to inform our parent that it can start the new instance.
 	if p, err := os.FindProcess(os.Getppid()); err == nil {
 		if err = p.Signal(syscall.SIGCHLD); err != nil {
-			LogError("seamless: Could not send SIGCHLD to parent process", err)
+			LogError("Could not send SIGCHLD to parent process", err)
 		}
 	} else {
-		LogError("seamless: Could not find parent process", err)
+		LogError("Could not find parent process", err)
 		// If our parent is dead already, the supervisor might still restart the process
 		// so we should be able to continue regardless.
 	}
@@ -159,28 +159,28 @@ func Started() {
 			// No pid file = no old process to notify
 			return
 		}
-		LogError("seamless: Notification error", fmt.Errorf("cannot read PID file: %v", err))
+		LogError("Notification error", fmt.Errorf("cannot read PID file: %v", err))
 		return
 	}
-	LogMessage("seamless: Notifying old process")
+	LogMessage("Notifying old process")
 	os.Remove(pidFilePath)
 	var pid int
 	if _, err := fmt.Sscanf(string(b), "%d", &pid); err != nil {
-		LogError("seamless: Notification error", fmt.Errorf("invalid PID file content: %v", err))
+		LogError("Notification error", fmt.Errorf("invalid PID file content: %v", err))
 		return
 	}
 	if p, err := os.FindProcess(pid); err == nil {
 		if err = p.Signal(syscall.SIGTERM); err != nil {
-			LogError("seamless: Could not send SIGTERM to old process", err)
+			LogError("Could not send SIGTERM to old process", err)
 		}
 	} else {
-		LogError("seamless: Could not find old process", err)
+		LogError("Could not find old process", err)
 	}
 }
 
 func stage3() {
 	// We are waiting for a TERM signal to more to the next stage (stage 3).
-	LogMessage("seamless: Ready, waiting for TERM signal")
+	LogMessage("Ready, waiting for TERM signal")
 
 	signal.Reset(syscall.SIGTERM)
 	c := make(chan os.Signal, 1)
@@ -192,11 +192,11 @@ func stage3() {
 	}
 	signal.Stop(c)
 
-	LogMessage("seamless: Graceful shutdown started")
+	LogMessage("Graceful shutdown started")
 	if shutdownFunc != nil {
 		shutdownFunc()
 	}
-	LogMessage("seamless: Graceful shutdown completed")
+	LogMessage("Graceful shutdown completed")
 	close(doneCh)
 }
 

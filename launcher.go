@@ -25,7 +25,7 @@ import (
 func launch() {
 	cmd, err := os.Executable()
 	if err != nil {
-		LogError("seamless: Could not determin executable path", err)
+		LogError("Could not determin executable path", err)
 		os.Exit(1)
 	}
 	argv := os.Args
@@ -34,7 +34,7 @@ func launch() {
 	}
 	p, err := os.StartProcess(cmd, argv, attrs)
 	if err != nil {
-		LogError("seamless: Could not fork", err)
+		LogError("Could not fork", err)
 		os.Exit(1)
 	}
 	c := make(chan os.Signal, 10)
@@ -52,9 +52,9 @@ func launch() {
 			select {
 			case sig = <-c:
 			case <-timer:
-				LogError("seamless: Child timeout, terminating", nil)
+				LogError("Child timeout, terminating", nil)
 				if err := p.Signal(syscall.SIGTERM); err != nil {
-					LogError("seamless: Error sending TERM signal", err)
+					LogError("Error sending TERM signal", err)
 				}
 			}
 			switch sig {
@@ -63,7 +63,7 @@ func launch() {
 					continue
 				}
 				if err := p.Signal(syscall.SIGUSR2); err != nil {
-					LogError("seamless: Could not send USR2 signal", err)
+					LogError("Could not send USR2 signal", err)
 				}
 				terminated = true
 				// Setup a timer after which the child is sent a SIGTERM if
@@ -75,7 +75,7 @@ func launch() {
 				}
 			default:
 				if err := p.Signal(sig); err != nil {
-					LogError(fmt.Sprintf("seamless: Error forwarding %s signal", sig), err)
+					LogError(fmt.Sprintf("Error forwarding %s signal", sig), err)
 				}
 			}
 		}
