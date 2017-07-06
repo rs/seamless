@@ -74,13 +74,13 @@ var (
 	shutdownFunc        func()
 )
 
-// Init initialize seamless. This method must be called as earliest as possible in the program flow,
-// before any other goroutine are scheduled. This method must be called from the main goroutine,
-// either from the main method or preferably from the init method in the main package.
+// Init initialize seamless. This method must be called as earliest as possible
+// in the program flow, before any other goroutine are scheduled. This method
+// must be called from the main goroutine, either from the main method or
+// preferably from the init method in the main package.
 //
-// The pidFile is used for signaling between the new and old generation of the daemon. This
-// file is not a traditional pid file to be used by the process manager. If the pidFile is
-// an empty string, seamless is disabled.
+// The pidFile is used for signaling between the new and old generation of the
+// daemon. If the pidFile is an empty string, seamless is disabled.
 func Init(pidFile string) {
 	if inited {
 		panic("seamless.Init already called")
@@ -119,30 +119,28 @@ func stage1() {
 	signal.Stop(c)
 
 	LogMessage("Shutdown requested")
-	if err := ioutil.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
-		LogError("Could not create PID file", err)
-		return // XXX
-	}
 	if shutdownRequestFunc != nil {
 		shutdownRequestFunc()
 	}
-	// At this point, we are ready to inform our parent that it can start the new instance.
+	// At this point, we are ready to inform our parent that it can start the
+	// new instance.
 	if p, err := os.FindProcess(os.Getppid()); err == nil {
 		if err = p.Signal(syscall.SIGCHLD); err != nil {
 			LogError("Could not send SIGCHLD to parent process", err)
 		}
 	} else {
 		LogError("Could not find parent process", err)
-		// If our parent is dead already, the supervisor might still restart the process
-		// so we should be able to continue regardless.
+		// If our parent is dead already, the supervisor might still restart the
+		// process so we should be able to continue regardless.
 	}
 
 	stage3()
 }
 
-// Started must be called as soon as the server is started and ready to serve. This mean
-// that this method must be called after a successful listen. This can be challenging as
-// a listen call is blocking. See examples directory to see how to do that.
+// Started must be called as soon as the server is started and ready to serve.
+// This mean that this method must be called after a successful listen. This can
+// be challenging as a listen call is blocking. See examples directory to see
+// how to do that.
 func Started() {
 	if !inited {
 		panic("called seamless.Start before seamless.Init")
@@ -152,18 +150,26 @@ func Started() {
 		return
 	}
 
-	// this is stage 2 on the other (new) process
+	defer func() {
+		if err := ioutil.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
+			LogError("Could not create PID file", err)
+		}
+	}()
+
+	// This is stage 2 on the other (new) process.
 	b, err := ioutil.ReadFile(pidFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No pid file = no old process to notify
+			// No pid file = no old process to notify.
 			return
 		}
 		LogError("Notification error", fmt.Errorf("cannot read PID file: %v", err))
 		return
 	}
 	LogMessage("Notifying old process")
-	os.Remove(pidFilePath)
+	if err := os.Remove(pidFilePath); err != nil {
+		LogError("Could not remove old PID file", err)
+	}
 	var pid int
 	if _, err := fmt.Sscanf(string(b), "%d", &pid); err != nil {
 		LogError("Notification error", fmt.Errorf("invalid PID file content: %v", err))
@@ -188,7 +194,7 @@ func stage3() {
 	select {
 	case <-c:
 	case <-time.After(10 * time.Second):
-		// Trigger stage3 if no TERM received within 10 seconds
+		// Trigger stage3 if no TERM received within 10 seconds.
 	}
 	signal.Stop(c)
 
