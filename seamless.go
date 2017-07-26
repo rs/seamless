@@ -66,12 +66,12 @@ var (
 		log.Printf("seamless: %s: %v", msg, err)
 	}
 
-	inited              bool
-	disabled            bool
-	doneCh              chan struct{}
-	pidFilePath         string
-	shutdownRequestFunc func()
-	shutdownFunc        func()
+	inited               bool
+	disabled             bool
+	doneCh               chan struct{}
+	pidFilePath          string
+	shutdownRequestFuncs []func()
+	shutdownFuncs        []func()
 )
 
 // Init initialize seamless. This method must be called as earliest as possible
@@ -119,8 +119,8 @@ func stage1() {
 	signal.Stop(c)
 
 	LogMessage("Shutdown requested")
-	if shutdownRequestFunc != nil {
-		shutdownRequestFunc()
+	for _, f := range shutdownRequestFuncs {
+		f()
 	}
 	// At this point, we are ready to inform our parent that it can start the
 	// new instance.
@@ -199,8 +199,8 @@ func stage3() {
 	signal.Stop(c)
 
 	LogMessage("Graceful shutdown started")
-	if shutdownFunc != nil {
-		shutdownFunc()
+	for _, f := range shutdownFuncs {
+		f()
 	}
 	LogMessage("Graceful shutdown completed")
 	close(doneCh)
@@ -214,14 +214,14 @@ func stage3() {
 // The actual graceful shutdown should not be initiated at this stage. See
 // OnShutdown for that.
 func OnShutdownRequest(f func()) {
-	shutdownRequestFunc = f
+	shutdownRequestFuncs = append(shutdownRequestFuncs, f)
 }
 
 // OnShutdown set f to be called when the graceful shutdown is engaged. When f
 // returns, the graceful shutdown is considered done, and seamless.Wait will
 // unblock.
 func OnShutdown(f func()) {
-	shutdownFunc = f
+	shutdownFuncs = append(shutdownFuncs, f)
 }
 
 // Wait blocks until the seamless restart is completed. This method should be
