@@ -124,7 +124,8 @@ func stage1() {
 	}
 	// At this point, we are ready to inform our parent that it can start the
 	// new instance.
-	if p, err := os.FindProcess(os.Getppid()); err == nil {
+	p, _ := os.FindProcess(os.Getppid())
+	if err := p.Signal(syscall.Signal(0)); err == nil {
 		if err = p.Signal(syscall.SIGCHLD); err != nil {
 			LogError("Could not send SIGCHLD to parent process", err)
 		}
@@ -175,7 +176,8 @@ func Started() {
 		LogError("Notification error", fmt.Errorf("invalid PID file content: %v", err))
 		return
 	}
-	if p, err := os.FindProcess(pid); err == nil {
+	p, _ := os.FindProcess(pid)
+	if err := p.Signal(syscall.Signal(0)); err == nil {
 		if err = p.Signal(syscall.SIGTERM); err != nil {
 			LogError("Could not send SIGTERM to old process", err)
 		}
