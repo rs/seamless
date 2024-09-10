@@ -69,6 +69,7 @@ var (
 	disabled             bool
 	doneCh               chan struct{}
 	pidFilePath          string
+	onChildDaemonLaunch  []func()
 	shutdownRequestFuncs []func()
 	shutdownFuncs        []func()
 )
@@ -223,6 +224,13 @@ func OnShutdownRequest(f func()) {
 // unblock.
 func OnShutdown(f func()) {
 	shutdownFuncs = append(shutdownFuncs, f)
+}
+
+// OnChildDaemonLaunch executes f() after successful launch of the child process
+// by the launcher. f() should not be blocking.
+// Typical use case include resource cleanups, logging etc.
+func OnChildDaemonLaunch(f func()) {
+	onChildDaemonLaunch = append(onChildDaemonLaunch, f)
 }
 
 // Wait blocks until the seamless restart is completed. This method should be
