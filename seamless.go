@@ -17,8 +17,9 @@
 // During the first stage, the daemon prepare itself to welcome a new version of
 // itself by creating a PID file (see below) and by for instance closing file
 // descriptors. At this point, the daemon is still supposed to accept requests.
-// Once read, seamless make it send a CHLD signal back to the launcher (its
-// parent). Upon reception, the launcher, immediately die, cutting to link
+// Once read, seamless sends a CHLD signal by default (or one defined by the user
+// in SetParentTermSignal) back to the launcher (parent) on behalf of the child daemon.
+// Upon reception, the launcher, immediately die, cutting to link
 // between the supervisor and the daemon, making the supervisor attempting a
 // restart of the daemon while current daemon is still running, detached and
 // unsupervised.
@@ -69,6 +70,7 @@ var (
 	disabled             bool
 	doneCh               chan struct{}
 	pidFilePath          string
+	parentTermSignal     = os.Signal(syscall.SIGCHLD)
 	onChildDaemonLaunch  []func()
 	shutdownRequestFuncs []func()
 	shutdownFuncs        []func()
@@ -126,8 +128,8 @@ func stage1() {
 	// new instance.
 	p, _ := os.FindProcess(os.Getppid())
 	if err := p.Signal(syscall.Signal(0)); err == nil {
-		if err = p.Signal(syscall.SIGCHLD); err != nil {
-			LogError("Could not send SIGCHLD to parent process", err)
+		if err = p.Signal(parentTermSignal); err != nil {
+			LogError(fmt.Sprintf("Could not send signal: %s to parent process", parentTermSignal.String()), err)
 		}
 	} else {
 		LogError("Could not find parent process", err)
@@ -231,6 +233,16 @@ func OnShutdown(f func()) {
 // Typical use case include resource cleanups, logging etc.
 func OnChildDaemonLaunch(f func()) {
 	onChildDaemonLaunch = append(onChildDaemonLaunch, f)
+}
+
+// SetParentTermSignal allows user to define signal to send to the parent process
+// to trigger shutdown of the parent (launcher) process.
+// By default seamless sends SIGCHLD to the parent.
+func SetParentTermSignal(sig os.Signal) {
+	if inited {
+		panic("seamless.SetParentTermSignal must be called before seamless.Init")
+	}
+	parentTermSignal = sig
 }
 
 // Wait blocks until the seamless restart is completed. This method should be

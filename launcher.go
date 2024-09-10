@@ -75,6 +75,8 @@ func launch() {
 				// Setup a timer after which the child is sent a SIGTERM if
 				// no SIGCHLD has been recieved.
 				timer = time.After(10 * time.Second)
+			case parentTermSignal:
+				fallthrough
 			case syscall.SIGCHLD:
 				if terminated {
 					os.Exit(0)
