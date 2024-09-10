@@ -37,6 +37,12 @@ func launch() {
 		LogError("Could not fork", err)
 		os.Exit(1)
 	}
+
+	// Execute callbacks post the daemon launch before starting signal handler
+	for _, f := range onChildDaemonLaunch {
+		f()
+	}
+
 	c := make(chan os.Signal, 10)
 	signal.Notify(c, syscall.SIGABRT, syscall.SIGALRM, syscall.SIGBUS, syscall.SIGCHLD,
 		syscall.SIGCONT, syscall.SIGFPE, syscall.SIGHUP, syscall.SIGILL, syscall.SIGINT,
@@ -69,6 +75,8 @@ func launch() {
 				// Setup a timer after which the child is sent a SIGTERM if
 				// no SIGCHLD has been recieved.
 				timer = time.After(10 * time.Second)
+			case parentTermSignal:
+				fallthrough
 			case syscall.SIGCHLD:
 				if terminated {
 					os.Exit(0)
