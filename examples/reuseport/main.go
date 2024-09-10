@@ -5,12 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"syscall"
 	"time"
 
-	reuseport "github.com/kavu/go_reuseport"
 	"github.com/rs/seamless"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -25,14 +27,23 @@ func init() {
 }
 
 func main() {
-	// Use github.com/kavu/go_reuseport waiting for
-	// https://github.com/golang/go/issues/9661 to be fixed.
-	//
 	// The idea of SO_REUSEPORT flag is that two processes can listen on the
 	// same host:port. Using the capability, the new daemon can listen while
 	// the old daemon is still bound, allowing seemless transition from one
 	// process to the other.
-	l, err := reuseport.Listen("tcp", *listen)
+	lc := net.ListenConfig{
+		Control: func(network, address string, c syscall.RawConn) error {
+			var sysErr error
+			err := c.Control(func(fd uintptr) {
+				sysErr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+			})
+			if err != nil {
+				return err
+			}
+			return sysErr
+		},
+	}
+	l, err := lc.Listen(context.TODO(), "tcp", *listen)
 	if err != nil {
 		log.Fatal(err)
 	}

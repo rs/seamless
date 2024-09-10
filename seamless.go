@@ -43,7 +43,6 @@ package seamless
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -152,13 +151,13 @@ func Started() {
 	}
 
 	defer func() {
-		if err := ioutil.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
+		if err := os.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
 			LogError("Could not create PID file", err)
 		}
 	}()
 
 	// This is stage 2 on the other (new) process.
-	b, err := ioutil.ReadFile(pidFilePath)
+	b, err := os.ReadFile(pidFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// No pid file = no old process to notify.
